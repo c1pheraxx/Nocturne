@@ -1,128 +1,167 @@
 #include <iostream>
-#include <cstring>
+#include <string>
+#include <vector>
 #include <windows.h>
-#include "../src/core/process.h"
-#include "../src/core/memory.h"
-#include "../src/registry/entity_scanner.h"
-#include "../src/unity/unity_camera.h"
-#include "../src/unity/unity_transform.h"
-#include "../src/math/projection.h"
+#include <tlhelp32.h>
+#include <psapi.h>
+#include <nocturne/core/process.h>
+#include <nocturne/registry/entity_scanner.h>
+#include <nocturne/math/projection.h>
 
-using namespace nocturne;
+namespace nocturne::demo {
 
-void print_usage() {
-    std::cout << "=== Nocturne Demo ===" << std::endl;
-    std::cout << "Uso: NocturneDemo.exe <nome_do_processo.exe>" << std::endl;
-    std::cout << "Exemplo: NocturneDemo.exe MyGame.exe" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Comandos:" << std::endl;
-    std::cout << "  scan     - Escaneia entidades no jogo" << std::endl;
-    std::cout << "  players  - Escaneia jogadores" << std::endl;
-    std::cout << "  camera   - Mostra info da camera" << std::endl;
-    std::cout << "  w2s      - Testa world-to-screen na entidade mais proxima" << std::endl;
-    std::cout << "  quit     - Sai" << std::endl;
+struct UnityGame {
+    std::wstring name;
+    DWORD pid;
+};
+
+std::vector<UnityGame> find_unity_games() {
+    std::vector<UnityGame> games;
+    
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return games;
+    
+    PROCESSENTRY32W pe;
+    pe.dwSize = sizeof(pe);
+    
+    if (Process32FirstW(snapshot, &pe)) {
+        do {
+            HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID);
+            if (!hProcess) continue;
+            
+            HMODULE hMods[1024];
+            DWORD cbNeeded;
+            bool isUnity = false;
+            
+            if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+                for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
+                    wchar_t modName[MAX_PATH];
+                    if (GetModuleBaseNameW(hProcess, hMods[i], modName, sizeof(modName) / sizeof(wchar_t))) {
+                        if (_wcsicmp(modName, L"UnityPlayer.dll") == 0) {
+                            isUnity = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            CloseHandle(hProcess);
+            
+            if (isUnity) {
+                games.push_back({pe.szExeFile, pe.th32ProcessID});
+            }
+        } while (Process32NextW(snapshot, &pe));
+    }
+    
+    CloseHandle(snapshot);
+    return games;
 }
 
-int main(int argc, char* argv[]) {
+} // namespace nocturne::demo
+
+int wmain(int argc, wchar_t* argv[]) {
+    using namespace nocturne;
+    
+    std::wstring target_name;
+    
     if (argc < 2) {
-        print_usage();
+        std::wcout << L"========================================" << std::endl;
+        std::wcout << L" Nocturne - Detector de Jogos Unity" << std::endl;
+        std::wcout << L"========================================" << std::endl << std::endl;
+        
+        auto games = demo::find_unity_games();
+        
+        if (games.empty()) {
+            std::wcout << L"[AVISO] Nenhum jogo Unity encontrado em execucao." << std::endl;
+            std::wcout << L"[INFO] Abra um jogo Unity e rode novamente." << std::endl << std::endl;
+            std::wcout << L"Uso: NocturneDemo.exe <NomeDoJogo.exe>" << std::endl;
+            std::wcout << L"   ou: NocturneDemo.exe <PID>" << std::endl;
+            system("pause");
+            return 1;
+        }
+        
+        std::wcout << L"Jogos Unity detectados:" << std::endl;
+        std::wcout << L"----------------------------------------" << std::endl;
+        for (size_t i = 0; i < games.size(); ++i) {
+            std::wcout << L" [" << (i + 1) << L"] " << games[i].name 
+                       << L"  (PID: " << games[i].pid << L")" << std::endl;
+        }
+        std::wcout << L"----------------------------------------" << std::endl;
+        std::wcout << L"Digite o numero do jogo: ";
+        
+        int choice;
+        std::wcin >> choice;
+        
+        if (choice < 1 || choice > static_cast<int>(games.size())) {
+            std::wcout << L"[ERRO] Escolha invalida." << std::endl;
+            system("pause");
+            return 1;
+        }
+        
+        target_name = games[choice - 1].name;
+        std::wcout << L"[OK] Selecionado: " << target_name << std::endl << std::endl;
+    } else {
+        target_name = argv[1];
+    }
+    
+    core::Process proc;
+    if (!proc.attach(target_name.c_str())) {
+        std::wcout << L"[ERRO] Falha ao anexar ao processo: " << target_name << std::endl;
+        system("pause");
         return 1;
     }
-
-    std::wstring processName(argv[1], argv[1] + strlen(argv[1]));
-
-    core::Process process;
-    if (!process.attach(processName)) {
-        std::cerr << "Falha ao anexar ao processo: " << argv[1] << std::endl;
-        return 1;
-    }
-
-    std::cout << "Anexado a " << argv[1] << " (PID: " << process.pid() << ")" << std::endl;
-
-    core::Memory memory(&process);
-    registry::EntityScanner scanner(&process, &memory);
-
+    
+    std::wcout << L"[OK] Anexado a: " << target_name << std::endl;
+    
+    core::Memory mem(&proc);
+    registry::EntityScanner scanner(&proc, &mem);
+    
     if (!scanner.init()) {
-        std::cerr << "Falha ao inicializar scanner. Verifique se o jogo esta rodando." << std::endl;
+        std::wcout << L"[ERRO] Falha ao inicializar scanner." << std::endl;
+        std::wcout << L"[INFO] Verifique se os offsets/patterns estao corretos." << std::endl;
+        system("pause");
         return 1;
     }
-
-    std::cout << "Scanner inicializado. Digite um comando:" << std::endl;
-
+    
+    std::wcout << L"[OK] Scanner inicializado." << std::endl << std::endl;
+    std::wcout << L"Comandos disponiveis:" << std::endl;
+    std::wcout << L"  scan      - Listar todas as entidades" << std::endl;
+    std::wcout << L"  players   - Filtrar jogadores" << std::endl;
+    std::wcout << L"  camera    - Mostrar info da camera" << std::endl;
+    std::wcout << L"  w2s       - Testar world-to-screen" << std::endl;
+    std::wcout << L"  quit      - Sair" << std::endl;
+    std::wcout << std::endl;
+    
     std::string cmd;
     while (true) {
-        std::cout << "> ";
+        std::wcout << L"> ";
         std::cin >> cmd;
-
+        
         if (cmd == "quit" || cmd == "exit") break;
-
+        
         if (cmd == "scan") {
-            scanner.scan();
-            auto& reg = scanner.registry();
-            std::cout << "Entidades encontradas: " << reg.entity_count() << std::endl;
-            for (const auto& e : reg.entities()) {
-                std::cout << "  [" << e.id << "] " << e.name
-                          << " | Pos(" << e.position.x << ", " << e.position.y << ", " << e.position.z << ")"
-                          << " | Dist: " << e.distance << std::endl;
-            }
-        }
-        else if (cmd == "players") {
-            scanner.scan_players({"Player", "Character", "Bot", "NPC", "Hero"});
-            auto& reg = scanner.registry();
-            std::cout << "Jogadores encontrados: " << reg.player_count() << std::endl;
-            for (const auto& p : reg.players()) {
-                std::cout << "  [" << p.id << "] " << p.name
-                          << " | Pos(" << p.position.x << ", " << p.position.y << ", " << p.position.z << ")"
-                          << " | Local: " << (p.is_local ? "Sim" : "Nao")
-                          << " | NPC: " << (p.is_npc ? "Sim" : "Nao")
-                          << " | Bones: " << p.skeleton.size() << std::endl;
-            }
-        }
-        else if (cmd == "camera") {
-            unity::UnityResolver resolver(&process, &memory);
-            resolver.init();
-            unity::CameraReader camReader(&memory);
-            uintptr_t camAddr = resolver.resolve_camera();
-            if (camAddr) {
-                auto pos = camReader.position(camAddr);
-                auto fov = camReader.fov(camAddr);
-                std::cout << "Camera: " << pos.x << ", " << pos.y << ", " << pos.z
-                          << " | FOV: " << fov << std::endl;
-            } else {
-                std::cout << "Camera nao resolvida." << std::endl;
-            }
-        }
-        else if (cmd == "w2s") {
-            scanner.scan_players({"Player", "Character"});
-            auto& reg = scanner.registry();
-            if (reg.players().empty()) {
-                std::cout << "Nenhum jogador encontrado." << std::endl;
+            scanner.scan_all();
+            std::wcout << L"Entidades encontradas: " << scanner.registry().entities().size() << std::endl;
+        } else if (cmd == "players") {
+            scanner.scan_players({L"Player", L"Bot", L"NPC"});
+            std::wcout << L"Jogadores encontrados: " << scanner.registry().players().size() << std::endl;
+        } else if (cmd == "camera") {
+            auto cam = scanner.camera_info();
+            std::wcout << L"Camera resolvida: " << (cam.valid ? L"SIM" : L"NAO") << std::endl;
+        } else if (cmd == "w2s") {
+            auto cam = scanner.camera_info();
+            if (!cam.valid) {
+                std::wcout << L"[ERRO] Camera nao resolvida." << std::endl;
                 continue;
             }
-
-            unity::UnityResolver resolver(&process, &memory);
-            resolver.init();
-            unity::CameraReader camReader(&memory);
-            uintptr_t camAddr = resolver.resolve_camera();
-            if (!camAddr) {
-                std::cout << "Camera nao resolvida." << std::endl;
-                continue;
-            }
-
-            auto vm = camReader.view_matrix(camAddr);
-            auto& p = reg.players()[0];
-            auto screen = math::Projection::world_to_screen(p.position, 1920, 1080, vm);
-
-            std::cout << "W2S para " << p.name << ":"
-                      << " X=" << screen.x << " Y=" << screen.y
-                      << " Depth=" << screen.depth
-                      << " OnScreen=" << (screen.onScreen ? "Sim" : "Nao") << std::endl;
-        }
-        else {
-            std::cout << "Comando desconhecido: " << cmd << std::endl;
+            math::Vec3 world(0, 0, 0);
+            auto screen = math::Projection::world_to_screen(world, 1920, 1080, cam.view_matrix);
+            std::wcout << L"W2S (0,0,0) -> (" << screen.x << L", " << screen.y << L") onScreen=" << screen.on_screen << std::endl;
+        } else {
+            std::wcout << L"Comando desconhecido: " << cmd.c_str() << std::endl;
         }
     }
-
-    std::cout << "Saindo..." << std::endl;
+    
+    proc.detach();
     return 0;
 }
