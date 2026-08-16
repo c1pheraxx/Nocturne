@@ -44,7 +44,7 @@ add_library(nocturne STATIC ${SOURCES} ${HEADERS})
 target_include_directories(nocturne PUBLIC src)
 
 if(WIN32)
-    target_link_libraries(nocturne PUBLIC dwmapi d3d11)
+    target_link_libraries(nocturne PUBLIC dwmapi d3d11 psapi)
 endif()
 
 # Demo executable
