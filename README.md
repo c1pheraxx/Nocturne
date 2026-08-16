@@ -93,6 +93,7 @@
   <tr><td><b>World-to-Screen</b></td><td>Full 3D projection using the camera view-projection matrix.</td></tr>
   <tr><td><b>Entity Registry</b></td><td>Centralized tracking with distance calculation, visibility flags, and cleanup.</td></tr>
   <tr><td><b>DirectX11 Overlay</b></td><td>Transparent overlay window ready for ESP integration.</td></tr>
+  <tr><td><b>Auto Game Detection</b></td><td>Demo automatically detects running Unity games by scanning for <code>UnityPlayer.dll</code>.</td></tr>
 </table>
 
 <br>
@@ -128,7 +129,7 @@ Nocturne/
 │   └── overlay.h/cpp         # DirectX11 transparent window
 │
 └── src/demo/           # Console demo
-    └── demo.cpp
+    └── demo.cpp              # Auto-detects Unity games
 </pre>
 
 <br>
@@ -154,6 +155,10 @@ cmake --build build --config Release
 </table>
 
 <h3>3. Run the Demo</h3>
+
+<p><b>Automatic detection (no arguments):</b></p>
+<pre><code>NocturneDemo.exe</code></pre>
+<p>The demo will scan for running Unity games and present a numbered list. Select one to attach.</p>
 
 <pre><code>NocturneDemo.exe TargetGame.exe
 &gt; scan      # List all entities
@@ -195,7 +200,7 @@ for (const auto&amp; p : scanner.registry().players()) {
 <table>
   <tr><th>Tool</th><th>Version</th><th>Purpose</th></tr>
   <tr><td>Windows</td><td>10/11 x64</td><td>Target platform</td></tr>
-  <tr><td>Visual Studio</td><td>2019+</td><td>Compiler &amp; Windows SDK</td></tr>
+  <tr><td>Visual Studio</td><td>2019, 2022, 2026+</td><td>Compiler &amp; Windows SDK</td></tr>
   <tr><td>CMake</td><td>3.16+</td><td>Build generation</td></tr>
 </table>
 
@@ -206,13 +211,20 @@ for (const auto&amp; p : scanner.registry().players()) {
 <p><b>Method 1 — Automatic (Recommended):</b></p>
 <pre><code>build.bat
 </code></pre>
+<p>Automatically detects Visual Studio 2019 / 2022 / 2026, cleans stale CMake cache, and falls back through compatible generators.</p>
 
 <p><b>Method 2 — CMake Manual:</b></p>
-<pre><code># VS 2022
+<pre><code># VS 2026
+cmake -B build -S . -G "Visual Studio 18 2026" -A x64
+cmake --build build --config Release
+
+VS 2022
+
 cmake -B build -S . -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 
-# VS 2019
+VS 2019
+
 cmake -B build -S . -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
 </code></pre>
@@ -226,7 +238,7 @@ cmake --build build
 
 <pre>
 build/Release/
-├── NocturneDemo.exe      # Console demo
+├── NocturneDemo.exe      # Console demo with auto-detection
 ├── NocturneTests.exe     # Unit tests
 └── nocturne.lib          # Static library
 </pre>
@@ -318,6 +330,9 @@ Unity 2022+:     48 8B 0D ?? ?? ?? ?? 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ??
   <tr><td><code>Platform x64 not supported</code></td><td>Using NMake generator</td><td>Force VS generator: <code>cmake -G "Visual Studio 17 2022"</code></td></tr>
   <tr><td><code>Cannot open include file</code></td><td>Missing Windows SDK</td><td>Install "Windows 10/11 SDK" via Visual Studio Installer</td></tr>
   <tr><td><code>Unresolved external symbol</code></td><td>Missing libs</td><td>Ensure <code>d3d11.lib</code> and <code>dwmapi.lib</code> are linked (already in .vcxproj)</td></tr>
+  <tr><td><code>std::vector&lt;bool&gt; has no member data</code></td><td>Using outdated source</td><td>Update to latest main — fixed in recent commits</td></tr>
+  <tr><td><code>CMakeCache.txt mismatch</code></td><td>Stale cache from different generator</td><td>Run <code>build.bat</code> (auto-cleans) or delete <code>build/</code> manually</td></tr>
+  <tr><td><code>Visual Studio with C++ not found</code></td><td>VS installed in non-standard path or missing workload</td><td>Install "Desktop development with C++" workload via VS Installer</td></tr>
 </table>
 
 <h3>Runtime Errors</h3>
@@ -330,6 +345,7 @@ Unity 2022+:     48 8B 0D ?? ?? ?? ?? 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ??
   <tr><td><code>All positions are zero</code></td><td>Wrong Transform offsets</td><td>Re-dump Transform structure in Cheat Engine</td></tr>
   <tr><td><code>W2S returns off-screen</code></td><td>Wrong view matrix offset</td><td>Verify Camera view matrix offset; try <code>0x2E4</code>, <code>0x300</code>, or <code>0x7C</code></td></tr>
   <tr><td><code>Overlay not showing</code></td><td>DWM composition disabled</td><td>Ensure Windows Aero/DWM is enabled</td></tr>
+  <tr><td><code>No Unity games found</code></td><td>No Unity process running</td><td>Open a Unity game before running <code>NocturneDemo.exe</code> without arguments</td></tr>
 </table>
 
 <h3>Git Push Errors</h3>
@@ -366,6 +382,10 @@ Unity 2022+:     48 8B 0D ?? ?? ?? ?? 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ??
     <td><b>Where do I find the GameObjectManager?</b></td>
     <td>In Cheat Engine, open <code>UnityPlayer.dll</code>, search for byte arrays matching the patterns above. The first valid result that points to a structure with active GameObjects is usually correct.</td>
   </tr>
+  <tr>
+    <td><b>The demo crashes without arguments</b></td>
+    <td>Update to the latest version. The demo now auto-detects Unity games when run without arguments.</td>
+  </tr>
 </table>
 
 <br>
@@ -384,6 +404,9 @@ Unity 2022+:     48 8B 0D ?? ?? ?? ?? 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ??
   <li>✓ World-to-screen projection</li>
   <li>✓ DirectX11 overlay skeleton</li>
   <li>✓ Console demo</li>
+  <li>✓ Console demo with auto-detection</li>
+  <li>✓ MSVC compilation fixes (<code>vector&lt;bool&gt;</code>, missing includes)</li>
+  <li>✓ Visual Studio 2026 support</li>
 </ul>
 
 <h3>v0.2 <img src="https://img.shields.io/badge/status-in%20progress-f59e0b?style=flat-square"/></h3>
