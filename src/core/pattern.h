@@ -1,5 +1,4 @@
 #pragma once
-#include <windows.h>
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -20,7 +19,7 @@ public:
     static ScanResult scan_module(Process* process, const std::wstring& moduleName, const std::string& pattern);
 
 private:
-    static bool compare(const uint8_t* data, const uint8_t* pattern, const bool* mask, size_t len);
+    static bool compare(const uint8_t* data, const uint8_t* pattern, const uint8_t* mask, size_t len);
 };
 
 } // namespace nocturne::core
