@@ -2,7 +2,8 @@
 #include "process.h"
 #include "module.h"
 #include "memory.h"
-#include <algorithm>
+#include <vector>
+#include <string>
 
 namespace nocturne::core {
 
@@ -28,7 +29,7 @@ std::vector<uint8_t> Pattern::parse(const std::string& pattern) {
     return bytes;
 }
 
-bool Pattern::compare(const uint8_t* data, const uint8_t* pattern, const bool* mask, size_t len) {
+bool Pattern::compare(const uint8_t* data, const uint8_t* pattern, const uint8_t* mask, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         if (!mask[i] && data[i] != pattern[i]) return false;
     }
@@ -42,7 +43,7 @@ Pattern::ScanResult Pattern::scan(Process* process, uintptr_t start, size_t size
     auto bytes = parse(pat);
     if (bytes.empty()) return result;
 
-    std::vector<bool> mask;
+    std::vector<uint8_t> mask;
     mask.reserve(bytes.size());
     {
         std::string current;
@@ -62,7 +63,7 @@ Pattern::ScanResult Pattern::scan(Process* process, uintptr_t start, size_t size
         if (!current.empty()) mask.push_back(true);
     }
 
-    std::vector<uint8_t> buffer(size);
+    std::vector<uint8_t> buffer(size);  // <-- CORRIGIDO: vector<bool> -> vector<uint8_t>
     SIZE_T read = 0;
     if (!ReadProcessMemory(process->handle(), reinterpret_cast<LPCVOID>(start), buffer.data(), size, &read)) {
         return result;
