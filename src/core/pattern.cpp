@@ -86,4 +86,4 @@ Pattern::ScanResult Pattern::scan_module(Process* process, const std::wstring& m
     return scan(process, info.base, info.size, pat);
 }
 
-} // namespace nocturne::core
+} // namespace nocturne::core.
