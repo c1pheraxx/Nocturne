@@ -1,7 +1,8 @@
 #pragma once
 #include "../math/vec3.h"
-#include <cstdint>
+#include "unity_skeleton.h"
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 namespace nocturne::unity {
