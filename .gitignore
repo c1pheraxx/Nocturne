@@ -1,0 +1,24 @@
+# Build
+build/
+out/
+cmake-build-*/
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.ncb
+*.sdf
+*.opensdf
+
+# OS
+.DS_Store
+Thumbs.db
