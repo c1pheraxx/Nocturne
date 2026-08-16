@@ -50,20 +50,20 @@ Pattern::ScanResult Pattern::scan(Process* process, uintptr_t start, size_t size
         for (char c : pat) {
             if (c == ' ') {
                 if (!current.empty()) {
-                    mask.push_back(true);
+                    mask.push_back(1);
                     current.clear();
                 }
             } else if (c == '?') {
-                mask.push_back(false);
+                mask.push_back(0);
                 current.clear();
             } else {
                 current += c;
             }
         }
-        if (!current.empty()) mask.push_back(true);
+        if (!current.empty()) mask.push_back(1);
     }
 
-    std::vector<uint8_t> buffer(size);  // <-- CORRIGIDO: vector<bool> -> vector<uint8_t>
+    std::vector<uint8_t> buffer(size);
     SIZE_T read = 0;
     if (!ReadProcessMemory(process->handle(), reinterpret_cast<LPCVOID>(start), buffer.data(), size, &read)) {
         return result;
@@ -86,4 +86,4 @@ Pattern::ScanResult Pattern::scan_module(Process* process, const std::wstring& m
     return scan(process, info.base, info.size, pat);
 }
 
-} // namespace nocturne::core.
+} // namespace nocturne::core
