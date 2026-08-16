@@ -1,6 +1,6 @@
 #include <iostream>
-#include <cassert>
 #include <cmath>
+#include <vector>
 #include "../src/math/vec3.h"
 #include "../src/math/matrix.h"
 #include "../src/math/projection.h"
@@ -60,7 +60,6 @@ int main() {
     // Registry tests (mock)
     check(true, "Registry placeholder");
 
-    std::cout << "
-=== RESULTADO: " << tests_passed << " passaram, " << tests_failed << " falharam ===" << std::endl;
+    std::cout << "\n=== RESULTADO: " << tests_passed << " passaram, " << tests_failed << " falharam ===" << std::endl;
     return tests_failed > 0 ? 1 : 0;
 }
